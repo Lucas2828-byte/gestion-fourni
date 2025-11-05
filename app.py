@@ -752,6 +752,35 @@ if st.session_state.admin_mode:
         }
         st.rerun()
 
+    st.markdown("---")
+    categories_vides = []
+    for cat, table_avis in avis_table_map.items():
+        cursor_avis.execute(f"SELECT COUNT(*) FROM {table_avis}")
+        total = cursor_avis.fetchone()[0]
+        
+        if total > 0:
+            cursor_avis.execute(f"SELECT COUNT(*) FROM {table_avis} WHERE pris = 1")
+            pris = cursor_avis.fetchone()[0]
+            
+            if pris == total:
+                categories_vides.append(cat)
+    
+    if categories_vides:
+        st.markdown(f"""
+        <div style="background:#dc3545;padding:16px;border-radius:10px;margin-bottom:20px;border:2px solid #c82333;">
+            <h3 style="color:white;margin:0;margin-bottom:10px;">🚨 ATTENTION : Catégories sans textes disponibles</h3>
+            <p style="color:white;margin:0;font-size:16px;">
+                Les catégories suivantes n'ont plus de textes d'avis disponibles (tous déjà utilisés) :
+            </p>
+            <ul style="color:white;font-size:15px;margin-top:10px;">
+                {''.join([f'<li><b>{cat}</b></li>' for cat in categories_vides])}
+            </ul>
+            <p style="color:white;margin:0;margin-top:10px;font-size:14px;">
+                ➡️ Rendez-vous dans l'onglet "📜 Textes d'avis" pour ajouter de nouveaux textes ou réinitialiser ceux existants.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
     tab1, tab2, tab3 = st.tabs(["👢 Fiches", "📜 Textes d'avis", "📊 Dashboard"])
 
     with tab3:
@@ -922,14 +951,34 @@ if st.session_state.admin_mode:
         cursor_avis.execute(f"SELECT COUNT(*) FROM {table_avis} WHERE pris = 1")
         nb_pris = cursor_avis.fetchone()[0]
         
-        if nb_pris > 0:
-            st.info(f"ℹ️ {nb_pris} texte(s) déjà utilisé(s) (pris = 1)")
-            if st.button("🔄 Réinitialiser tous les textes (remettre à prendre)", key="reset_pris"):
-                cursor_avis.execute(f"UPDATE {table_avis} SET pris = 0")
-                conn_avis.commit()
-                upload_db_to_github("fiches_final.db", "fiches_final.db")
-                st.success("✅ Tous les textes ont été réinitialisés !")
-                st.rerun()
+        cursor_avis.execute(f"SELECT COUNT(*) FROM {table_avis}")
+        nb_total = cursor_avis.fetchone()[0]
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if nb_pris > 0:
+                st.info(f"ℹ️ {nb_pris} texte(s) déjà utilisé(s) (pris = 1)")
+                if st.button("🔄 Réinitialiser tous les textes (remettre à prendre)", key="reset_pris"):
+                    cursor_avis.execute(f"UPDATE {table_avis} SET pris = 0")
+                    conn_avis.commit()
+                    upload_db_to_github("fiches_final.db", "fiches_final.db")
+                    st.success("✅ Tous les textes ont été réinitialisés !")
+                    st.rerun()
+        
+        with col2:
+            if nb_total > 0:
+                st.warning(f"⚠️ {nb_total} texte(s) dans cette catégorie")
+                confirm_delete_all = st.checkbox("Je confirme vouloir supprimer TOUS les textes", key=f"confirm_delete_all_{avis_cat}")
+                if st.button("🗑️ Supprimer TOUS les textes", key="delete_all_texts", disabled=not confirm_delete_all):
+                    if confirm_delete_all:
+                        cursor_avis.execute(f"DELETE FROM {table_avis}")
+                        conn_avis.commit()
+                        upload_db_to_github("fiches_final.db", "fiches_final.db")
+                        st.success(f"✅ Tous les textes de la catégorie '{avis_cat}' ont été supprimés !")
+                        st.rerun()
+                    else:
+                        st.error("❌ Veuillez cocher la case de confirmation.")
 
         with st.expander("➕ Ajouter un texte d'avis"):
             texte = st.text_area("Texte")
