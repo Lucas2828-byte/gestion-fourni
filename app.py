@@ -693,6 +693,46 @@ if st.session_state.admin_mode:
             st.success(f"Mode FORCE terminé — {n} ligne(s) à jour.")
             st.rerun()
 
+    st.markdown("### 🔍 Vérifier la cohérence des catégories")
+    if st.button("🔍 Vérifier et nettoyer les catégories", key="btn_check_categories"):
+        cursor_fiches.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'fiches_%'")
+        fiches_tables = {row[0] for row in cursor_fiches.fetchall()}
+        
+        cursor_avis.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'avis_%'")
+        avis_tables = {row[0] for row in cursor_avis.fetchall()}
+        
+        fiches_cats = {t.replace("fiches_", "") for t in fiches_tables}
+        avis_cats = {t.replace("avis_", "") for t in avis_tables}
+        
+        orphan_fiches = fiches_cats - avis_cats
+        orphan_avis = avis_cats - fiches_cats
+        
+        deleted_count = 0
+        messages = []
+        
+        for cat in orphan_fiches:
+            table_name = f"fiches_{cat}"
+            cursor_fiches.execute(f"DROP TABLE IF EXISTS {table_name}")
+            deleted_count += 1
+            messages.append(f"❌ Supprimé: table de fiches '{table_name}' (pas de table d'avis correspondante)")
+        
+        for cat in orphan_avis:
+            table_name = f"avis_{cat}"
+            cursor_avis.execute(f"DROP TABLE IF EXISTS {table_name}")
+            deleted_count += 1
+            messages.append(f"❌ Supprimé: table d'avis '{table_name}' (pas de table de fiches correspondante)")
+        
+        if deleted_count > 0:
+            conn_fiches.commit()
+            conn_avis.commit()
+            upload_databases_batch()
+            
+            st.warning(f"🧹 {deleted_count} table(s) orpheline(s) supprimée(s):")
+            for msg in messages:
+                st.write(msg)
+            st.rerun()
+        else:
+            st.success("✅ Toutes les catégories sont cohérentes entre les deux bases de données.")
 
     tab1, tab2, tab3 = st.tabs(["👢 Fiches", "📜 Textes d'avis", "📊 Dashboard"])
 
