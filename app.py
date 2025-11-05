@@ -656,20 +656,25 @@ if st.session_state.admin_mode:
                 st.warning("⚠️ Merci de saisir un nom de catégorie.")
 
         cat_to_delete = st.selectbox("Catégorie à supprimer", list(category_map.keys()), key="cat_del")
-        if st.button("Supprimer la catégorie", key="delete_cat"):
-            table_fiche = category_map[cat_to_delete]
-            table_avis = avis_table_map[cat_to_delete]
+        confirm_delete = st.checkbox("⚠️ Je confirme vouloir supprimer cette catégorie (action irréversible)", key="confirm_del")
+        
+        if st.button("Supprimer la catégorie", key="delete_cat", disabled=not confirm_delete):
+            if confirm_delete:
+                table_fiche = category_map[cat_to_delete]
+                table_avis = avis_table_map[cat_to_delete]
 
-            cursor_fiches.execute(f"DROP TABLE IF EXISTS {table_fiche}")
-            cursor_avis.execute(f"DROP TABLE IF EXISTS {table_avis}")
-            conn_fiches.commit()
-            conn_avis.commit()
-            
-            # Upload batch optimisé
-            upload_databases_batch()
+                cursor_fiches.execute(f"DROP TABLE IF EXISTS {table_fiche}")
+                cursor_avis.execute(f"DROP TABLE IF EXISTS {table_avis}")
+                conn_fiches.commit()
+                conn_avis.commit()
+                
+                # Upload batch optimisé
+                upload_databases_batch()
 
-            st.success(f"❌ Catégorie '{cat_to_delete}' supprimée avec succès.")
-            st.rerun()
+                st.success(f"❌ Catégorie '{cat_to_delete}' supprimée avec succès.")
+                st.rerun()
+            else:
+                st.error("❌ Veuillez cocher la case de confirmation.")
 
 # ADMIN
 if st.session_state.admin_mode:
@@ -694,6 +699,20 @@ if st.session_state.admin_mode:
             st.rerun()
 
     st.markdown("### 🔍 Vérifier la cohérence des catégories")
+    
+    if "check_categories_result" in st.session_state:
+        result = st.session_state.check_categories_result
+        if result["deleted_count"] > 0:
+            st.warning(f"🧹 {result['deleted_count']} table(s) orpheline(s) supprimée(s):")
+            for msg in result["messages"]:
+                st.write(msg)
+        else:
+            st.success("✅ Toutes les catégories sont cohérentes entre les deux bases de données.")
+        
+        if st.button("🔄 Nouvelle vérification", key="btn_new_check"):
+            del st.session_state.check_categories_result
+            st.rerun()
+    
     if st.button("🔍 Vérifier et nettoyer les catégories", key="btn_check_categories"):
         cursor_fiches.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'fiches_%'")
         fiches_tables = {row[0] for row in cursor_fiches.fetchall()}
@@ -726,13 +745,12 @@ if st.session_state.admin_mode:
             conn_fiches.commit()
             conn_avis.commit()
             upload_databases_batch()
-            
-            st.warning(f"🧹 {deleted_count} table(s) orpheline(s) supprimée(s):")
-            for msg in messages:
-                st.write(msg)
-            st.rerun()
-        else:
-            st.success("✅ Toutes les catégories sont cohérentes entre les deux bases de données.")
+        
+        st.session_state.check_categories_result = {
+            "deleted_count": deleted_count,
+            "messages": messages
+        }
+        st.rerun()
 
     tab1, tab2, tab3 = st.tabs(["👢 Fiches", "📜 Textes d'avis", "📊 Dashboard"])
 
