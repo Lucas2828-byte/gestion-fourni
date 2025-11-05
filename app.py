@@ -175,7 +175,7 @@ def hasher_mot_de_passe(mdp):
     return hashlib.sha256(mdp.encode()).hexdigest()
 
 def verifier_utilisateur(nom, mot_de_passe):
-    conn = sqlite3.connect("gestion_fourni-main/comptes.db")
+    conn = sqlite3.connect("comptes.db")
     cursor = conn.cursor()
     cursor.execute("SELECT mot_de_passe_hash, role FROM comptes WHERE nom_utilisateur = ?", (nom,))
     row = cursor.fetchone()
@@ -274,11 +274,11 @@ def upload_databases_batch():
     uploaded_count = 0
     
     # Upload fiches_final.db (textes)
-    if upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db"):
+    if upload_db_to_github("fiches_final.db", "fiches_final.db"):
         uploaded_count += 1
     
     # Upload fiches.db (fiches)
-    if upload_db_to_github("gestion_fourni-main/fiches.db", "fiches.db"):
+    if upload_db_to_github("fiches.db", "fiches.db"):
         uploaded_count += 1
     
     if uploaded_count > 0:
@@ -382,16 +382,16 @@ def download_db_from_github(repo_filename: str, local_path: str) -> bool:
 # --- SYNC DOWN : récupérer la dernière DB depuis GitHub au démarrage ---
 # Ne télécharger que si le fichier n'existe pas localement (premier lancement)
 # Cela évite d'écraser les modifications locales non encore uploadées
-if not os.path.exists("gestion_fourni-main/fiches.db"):
-    download_db_from_github("fiches.db", "gestion_fourni-main/fiches.db")
-if not os.path.exists("gestion_fourni-main/fiches_final.db"):
-    download_db_from_github("fiches_final.db", "gestion_fourni-main/fiches_final.db")
+if not os.path.exists("fiches.db"):
+    download_db_from_github("fiches.db", "fiches.db")
+if not os.path.exists("fiches_final.db"):
+    download_db_from_github("fiches_final.db", "fiches_final.db")
 
 # Configuration SQLite avec busy_timeout pour éviter les erreurs de verrouillage
-conn_fiches = sqlite3.connect("gestion_fourni-main/fiches.db", check_same_thread=False, timeout=30.0)
+conn_fiches = sqlite3.connect("fiches.db", check_same_thread=False, timeout=30.0)
 cursor_fiches = conn_fiches.cursor()
 
-conn_avis = sqlite3.connect("gestion_fourni-main/fiches_final.db", check_same_thread=False, timeout=30.0)
+conn_avis = sqlite3.connect("fiches_final.db", check_same_thread=False, timeout=30.0)
 cursor_avis = conn_avis.cursor()
 
 # Rechargement dynamique des catégories depuis les bases
@@ -755,7 +755,7 @@ if st.session_state.admin_mode:
                 ))
 
                 conn_fiches.commit()
-                upload_db_to_github("gestion_fourni-main/fiches.db", "fiches.db")
+                upload_db_to_github("fiches.db", "fiches.db")
                 st.success("Fiche ajoutée avec succès !")
                 st.rerun()
 
@@ -832,7 +832,7 @@ if st.session_state.admin_mode:
                     ))
 
                     conn_fiches.commit()
-                    upload_db_to_github("gestion_fourni-main/fiches.db", "fiches.db")
+                    upload_db_to_github("fiches.db", "fiches.db")
                     st.success("Fiche mise à jour ✅")
                     st.session_state.fiche_loaded = False
                     st.rerun()
@@ -846,7 +846,7 @@ if st.session_state.admin_mode:
                 if confirm_del:
                     cursor_fiches.execute(f"DELETE FROM {table} WHERE id = ?", (delete_id,))
                     conn_fiches.commit()
-                    upload_db_to_github("gestion_fourni-main/fiches.db", "fiches.db")
+                    upload_db_to_github("fiches.db", "fiches.db")
                     st.success("Fiche supprimée ❌")
                     st.rerun()
                 else:
@@ -869,7 +869,7 @@ if st.session_state.admin_mode:
             if st.button("🔄 Réinitialiser tous les textes (remettre à prendre)", key="reset_pris"):
                 cursor_avis.execute(f"UPDATE {table_avis} SET pris = 0")
                 conn_avis.commit()
-                upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db")
+                upload_db_to_github("fiches_final.db", "fiches_final.db")
                 st.success("✅ Tous les textes ont été réinitialisés !")
                 st.rerun()
 
@@ -878,7 +878,7 @@ if st.session_state.admin_mode:
             if st.button("Ajouter", key="add_avis"):
                 cursor_avis.execute(f"INSERT INTO {table_avis} (texte) VALUES (?)", (texte,))
                 conn_avis.commit()
-                upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db")
+                upload_db_to_github("fiches_final.db", "fiches_final.db")
                 st.success("Texte ajouté ✅")
                 st.rerun()
 
@@ -915,7 +915,7 @@ if st.session_state.admin_mode:
                             count_skipped += 1
                     
                     conn_avis.commit()
-                    upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db")
+                    upload_db_to_github("fiches_final.db", "fiches_final.db")
                     
                     st.success(f"✅ {count_added} avis ajouté(s) avec succès !")
                     if count_skipped > 0:
@@ -945,7 +945,7 @@ if st.session_state.admin_mode:
                         (nouveau, st.session_state.avis_id_en_cours)
                     )
                     conn_avis.commit()
-                    upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db")
+                    upload_db_to_github("fiches_final.db", "fiches_final.db")
                     st.success("Avis modifié ✅")
                     st.session_state.avis_loaded = False
                     st.rerun()
@@ -957,7 +957,7 @@ if st.session_state.admin_mode:
                 if confirm_avis:
                     cursor_avis.execute(f"DELETE FROM {table_avis} WHERE id=?", (avis_id_suppr,))
                     conn_avis.commit()
-                    upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db")
+                    upload_db_to_github("fiches_final.db", "fiches_final.db")
                     st.warning("Avis supprimé ❌")
                     st.rerun()
                 else:
@@ -1215,8 +1215,8 @@ if fiche:
 
                 if texte_marque_ok:
                     conn_fiches.commit()
-                    upload_db_to_github("gestion_fourni-main/fiches.db", "fiches.db")
-                    upload_db_to_github("gestion_fourni-main/fiches_final.db", "fiches_final.db")
+                    upload_db_to_github("fiches.db", "fiches.db")
+                    upload_db_to_github("fiches_final.db", "fiches_final.db")
                     st.success("✅ Fiche mise à jour et lien copié.")
                 
                 time.sleep(1)
