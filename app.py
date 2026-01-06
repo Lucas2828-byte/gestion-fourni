@@ -814,9 +814,19 @@ if st.session_state.admin_mode:
             with col2:
                 dernier = st.date_input("Dernier avis")
                 prochain = st.date_input("Prochain avis")
-                type_avis = st.selectbox("Type d'avis", options=[0, 1], 
-                                         format_func=lambda x: "⭐️⭐️⭐️⭐️⭐️" if x == 0 else "⭐️⭐️⭐️⭐️", 
-                                         key="add_type_avis")
+                type_avis = st.selectbox(
+                    "Type d'avis",
+                    options=[0, 1, 2, 3, 4],
+                    format_func=lambda x: {
+                        0: "⭐️⭐️⭐️⭐️⭐️ (5)",
+                        1: "⭐️⭐️⭐️⭐️ (4)",
+                        2: "⭐️⭐️⭐️ (3)",
+                        3: "⭐️⭐️ (2)",
+                        4: "⭐️ (1)",
+                    }.get(x, "⭐️⭐️⭐️⭐️⭐️ (5)"),
+                    key="add_type_avis"
+                )
+
                 localites_possibles = ["Paris", "Nord", "Strasbourg", "Lyon", "Marseille", "Sud-Ouest", "Tours", "Rennes", "Suisse", "Belgique"]
                 localite = st.selectbox("Localité", localites_possibles, key="add_localite")
             desc = st.text_area("Descriptif")
@@ -893,7 +903,19 @@ if st.session_state.admin_mode:
                     duree_cycle_val = 30
                 
                 fiche_data["duree_cycle"] = st.number_input("Durée du cycle (jours)", value=duree_cycle_val, min_value=1, key="mod_duree_cycle")
-                fiche_data["type_avis"] = st.selectbox("Type d'avis", options=[0, 1], format_func=lambda x: "⭐️⭐️⭐️⭐️⭐️" if x == 0 else "⭐️⭐️⭐️⭐️", key="mod_type_avis")
+                fiche_data["type_avis"] = st.selectbox(
+                    "Type d'avis",
+                    options=[0, 1, 2, 3, 4],
+                    format_func=lambda x: {
+                        0: "⭐️⭐️⭐️⭐️⭐️ (5)",
+                        1: "⭐️⭐️⭐️⭐️ (4)",
+                        2: "⭐️⭐️⭐️ (3)",
+                        3: "⭐️⭐️ (2)",
+                        4: "⭐️ (1)",
+                    }.get(x, "⭐️⭐️⭐️⭐️⭐️ (5)"),
+                    key="mod_type_avis"
+                )
+
 
                 
                 # Nouveaux champs
@@ -1180,17 +1202,25 @@ if fiche:
     type_avis = int(type_avis) if type_avis is not None else 0
     # Détection de la note
     # Déduction du texte et des étoiles
-    stars_display = "⭐️⭐️⭐️⭐️⭐️" if type_avis == 0 else "⭐️⭐️⭐️⭐️"
-    # Déterminer texte à copier
-    etoiles_texte = "5 Étoiles ⭐️⭐️⭐️⭐️⭐️" if type_avis == 0 else "4 Étoiles ⭐️⭐️⭐️⭐️"
-    etoiles_texte_js = etoiles_texte.replace("'", "\\'")  # pour JS
+    # Mapping type_avis -> nb étoiles
+    # 0->5★, 1->4★, 2->3★, 3->2★, 4->1★
+    stars_map = {
+        0: ("⭐️⭐️⭐️⭐️⭐️", "5 Étoiles ⭐️⭐️⭐️⭐️⭐️"),
+        1: ("⭐️⭐️⭐️⭐️",   "4 Étoiles ⭐️⭐️⭐️⭐️"),
+        2: ("⭐️⭐️⭐️",     "3 Étoiles ⭐️⭐️⭐️"),
+        3: ("⭐️⭐️",       "2 Étoiles ⭐️⭐️"),
+        4: ("⭐️",         "1 Étoile ⭐️"),
+    }
+    
+    stars_display, etoiles_texte = stars_map.get(type_avis, stars_map[0])
+    etoiles_texte_js = etoiles_texte.replace("'", "\\'")
     
     # HTML complet avec bouton fonctionnel
     html(f"""
     <div style="background:#2c2f33;padding:16px;border-radius:10px;margin-top:10px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;font-family:Arial,sans-serif;">
         <div>
             <div style="color:white;font-size:16px;margin-bottom:4px;"><b>Note de l'avis à laisser :</b></div>
-            <div style="font-size:22px;color:#f1c40f;">{"⭐️⭐️⭐️⭐️⭐️" if type_avis == 0 else "⭐️⭐️⭐️⭐️"}</div>
+            <div style="font-size:22px;color:#f1c40f;">{stars_display}</div>
         </div>
         <button onclick="navigator.clipboard.writeText('{etoiles_texte_js}')"
             style="background:#f39c12;color:white;padding:10px 18px;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">
@@ -1285,18 +1315,24 @@ if fiche:
                 cursor_fiches.execute(f"SELECT duree_cycle, type_avis FROM {table_name} WHERE id = ?", (fiche_id,))
                 current_cycle, current_type = cursor_fiches.fetchone()
                 
-                if current_type == 0 and current_cycle > 1:
-                    new_cycle = current_cycle - 1
-                    new_type = current_type
-                elif current_type == 0 and current_cycle <= 1:
-                    new_cycle = 1
-                    new_type = 1
-                elif current_type == 1:
-                    new_cycle = random.randint(2, 5)
-                    new_type = 0
-                else:
+                # Sécurité : si on a 2/3/4 (3★/2★/1★), on ne touche pas au type_avis automatiquement
+                # (on garde le type actuel et on recalcule juste prochain_avis)
+                if current_type not in (0, 1):
                     new_cycle = current_cycle
-                    new_type = current_type  # fallback de sécurité
+                    new_type = current_type
+                else:
+                    if current_type == 0 and current_cycle > 1:
+                        new_cycle = current_cycle - 1
+                        new_type = current_type
+                    elif current_type == 0 and current_cycle <= 1:
+                        new_cycle = 1
+                        new_type = 1
+                    elif current_type == 1:
+                        new_cycle = random.randint(2, 5)
+                        new_type = 0
+                    else:
+                        new_cycle = current_cycle
+                        new_type = current_type
                 
                 texte_id_a_marquer = st.session_state.get("texte_id_actuel", None)
                 
